@@ -103,13 +103,15 @@ without the studio, so we price in the same band:
 
 | Tier | Analogy | Tokens/mo | ≈ Photos | Price (draft) |
 |---|---|---|---|---|
-| **Trial** | Mini session | 30 tokens, once | ~20 photos + a few enhancements | **One-time payment, 7-week trial** — $49 |
+| **Trial** | Taster | 4 tokens, once | 2 photos + 1 enhancement | **One-time payment, 7-week trial** — $9 |
 | **Starter** | Standard session | 60/mo | ~40 | $99/mo |
 | **Pro** | Premium session | 150/mo | ~100 | $199/mo |
 | **Studio** | Full-day shoot | 400/mo | ~250+ | $399/mo |
 
-- Trial: **one-time Stripe payment**, grants a token bundle valid 7 weeks, then the
-  user must pick a monthly tier to continue.
+- Trial: **one-time Stripe payment** ($9), grants a small taster bundle — enough
+  for 2 generated photos plus 1 enhancement — valid 7 weeks, then the user must
+  pick a monthly tier to continue. Cheap enough to be an impulse buy; the 2 photos
+  are the sales pitch for the full tiers.
 - Monthly tiers: Stripe **subscriptions**; tokens refresh each billing cycle
   (decide: rollover cap, e.g., roll over up to 1 month's worth).
 - **Top-up packs**: one-time token purchases for users who run out mid-cycle.
