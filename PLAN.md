@@ -16,7 +16,9 @@ with their face transposed onto professionally-designed scenes.
 ## 1. Core User Flow
 
 ```
-Sign up → Buy plan (Stripe) → Upload 3–10 selfies/headshots
+Sign up → Buy plan (Stripe) → Upload X selfies/headshots (no hard cap;
+       minimum ~3 recommended for identity fidelity — more angles/lighting =
+       better likeness; we auto-select the best references per generation)
    → Pick purpose (Professional / Instagram / Dating)
    → Pick styles & scenes (or "surprise me")
    → Generation job runs (batch of N photos)
@@ -94,12 +96,17 @@ can be spent on modifications/enhancements instead.
 
 ### Plans (tiers sized like photography sessions)
 
+Tiers are priced to match what an equivalent photography session actually costs
+(mini sessions run ~$100–150; standard portrait sessions ~$200–350; premium/
+branding sessions ~$400–600; full-day shoots $750+). We deliver comparable volume
+without the studio, so we price in the same band:
+
 | Tier | Analogy | Tokens/mo | ≈ Photos | Price (draft) |
 |---|---|---|---|---|
-| **Trial** | Mini session | 30 tokens, once | ~20 photos + a few enhancements | **One-time payment, 7-week trial** (e.g., $19) |
-| **Starter** | Standard session | 60/mo | ~40 | $29/mo |
-| **Pro** | Premium session | 150/mo | ~100 | $59/mo |
-| **Studio** | Full-day shoot | 400/mo | ~250+ | $129/mo |
+| **Trial** | Mini session | 30 tokens, once | ~20 photos + a few enhancements | **One-time payment, 7-week trial** — $49 |
+| **Starter** | Standard session | 60/mo | ~40 | $99/mo |
+| **Pro** | Premium session | 150/mo | ~100 | $199/mo |
+| **Studio** | Full-day shoot | 400/mo | ~250+ | $399/mo |
 
 - Trial: **one-time Stripe payment**, grants a token bundle valid 7 weeks, then the
   user must pick a monthly tier to continue.
