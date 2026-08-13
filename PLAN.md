@@ -22,8 +22,8 @@ reasons the whole product depends on:
 
 1. **Professional** — LinkedIn / corporate headshots, speaker photos, team pages
 2. **Instagram profile** — lifestyle, aesthetic, candid-social looks
-3. **Dating apps** — candid, documentary-style photos optimized for Bumble/Hinge/Tinder,
-   plus photo auto-recommendation and Hinge caption generation
+3. **Dating apps** — candid, documentary-style photos optimized for dating profiles,
+   plus photo auto-recommendation and profile caption generation
 
 ---
 
@@ -39,7 +39,7 @@ Sign up → Buy plan (Stripe) → Upload X selfies/headshots (no hard cap;
    → Gallery: review results
    → ❤️ "Like" a photo → triggers Enhancement pass (costs extra tokens)
    → Download originals + enhanced versions
-   → (Dating only) Auto-recommend best photos per app + generate Hinge captions
+   → (Dating only) Auto-recommend best photos + generate profile captions
 ```
 
 ### The two-stage generation pipeline
@@ -105,10 +105,10 @@ open decision on whether we ship it at all.**
 ### Dating-app extras
 
 - **Auto-recommendation:** a vision-model pass scores each generated (and enhanced)
-  photo against per-app rubrics — Bumble (bright, smiling, outdoorsy, first-photo
-  clarity) vs. Hinge (candid, activity-based, conversation-starter potential) — and
-  returns a ranked "use these 6 for Bumble / these 6 for Hinge" set with reasons.
-- **Hinge captions:** an LLM generates suggested Hinge prompt answers and photo
+  photo against dating-profile rubrics — a strong bright/smiling "first photo,"
+  candid activity shots, conversation-starter potential, variety across the set —
+  and returns a ranked "use these 6, in this order" selection with reasons.
+- **Profile captions:** an LLM generates suggested profile prompt answers and photo
   captions matched to the selected photos (e.g., photo at a climbing gym → witty
   answer for "My most irrational fear…"). User picks a tone: witty / sincere /
   low-key.
@@ -127,7 +127,7 @@ Everything is denominated in **tokens** held in a per-user ledger:
 | Enhance a liked photo (Stage 2) | 2 tokens |
 | Regenerate / modify a photo (new scene, wardrobe change, "fix hands") | 1–2 tokens |
 | Dating photo auto-recommendation (per batch) | 1 token |
-| Hinge caption pack (10 captions) | 1 token |
+| Profile caption pack (10 captions) | 1 token |
 | **Remove AI-detectability / fingerprint** (per photo — see §5) | 2 tokens |
 
 Tokens are the single currency, so "you can pay with the tokens you get for each
@@ -204,8 +204,8 @@ Next.js 15 (App Router, TypeScript, Tailwind + shadcn/ui)  ← web app + API rou
   └── AI providers:
         • OpenAI Images API (gpt-image-1) — Stage 1 generation (images.edit with
           the user's reference photos as input) and Stage 2 enhancement
-        • OpenAI GPT-4o/vision — photo scoring for Bumble/Hinge recommendations
-        • LLM — Hinge caption generation
+        • OpenAI GPT-4o/vision — photo scoring for dating-profile recommendations
+        • LLM — profile caption generation
         • OpenAI moderation — screen uploads & outputs
 ```
 
@@ -249,8 +249,8 @@ GET  /api/jobs/:id             — job progress
 POST /api/photos/:id/like      — like → enqueue enhancement (debits tokens)
 POST /api/photos/:id/modify    — regenerate with tweaks (debits tokens)
 POST /api/photos/:id/undetect  — Stage 4 detectability removal (debits tokens; gated)
-POST /api/recommendations      — rank photos for bumble|hinge
-POST /api/captions             — generate Hinge captions for selected photos
+POST /api/recommendations      — rank photos for dating profile
+POST /api/captions             — generate profile captions for selected photos
 POST /api/stripe/checkout      — create Checkout session (trial | tier | topup)
 POST /api/stripe/webhook       — ledger credits, subscription state
 GET  /api/me/balance           — derived token balance
@@ -397,9 +397,9 @@ purposes with full template libraries, modify/regenerate flow, progress emails,
 and a **first cut of the admin dashboard** (KPIs + revenue-vs-cost + user list).
 
 **Phase 3 — Dating differentiators (~weeks 6–7)**
-Bumble/Hinge photo auto-recommendation with per-app rubrics, Hinge caption
-generator with tone picker, "export pack" (correctly sized/cropped images per
-app's specs).
+Dating-profile photo auto-recommendation with ranking rubrics, profile caption
+generator with tone picker, "export pack" (correctly sized/cropped images for
+common dating-profile specs).
 
 **Phase 4 — Growth (post-launch)**
 Referral tokens, seasonal template packs, quality A/B testing on templates,
