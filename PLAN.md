@@ -4,6 +4,20 @@ An AI face-swap photo generation service. Users upload a few real photos/headsho
 of themselves, pick a purpose, and receive a batch of brand-new, realistic photos
 with their face transposed onto professionally-designed scenes.
 
+**Core technology stance — face-swap first, not text-to-image.** The primary
+technique is *swapping the user's real face* onto a generated/stock body-and-scene,
+not asking an image model to imagine a person from scratch. This matters for two
+reasons the whole product depends on:
+
+- **Far less uncanny valley.** We keep the user's actual facial pixels/geometry and
+  composite them in, so eyes, teeth, and skin read as a real human instead of the
+  smeared, "almost-right" look pure generative portraits produce.
+- **Much more exact likeness.** The output is recognizably *them* — critical when
+  the photo goes on a dating profile they'll meet people from, or a professional
+  page. Scene generation handles the background/wardrobe; a dedicated face-swap +
+  identity-preservation step owns the face. (See §3 for the pipeline and §8 for the
+  provider/fidelity decision.)
+
 **Three purposes:**
 
 1. **Professional** — LinkedIn / corporate headshots, speaker photos, team pages
@@ -63,6 +77,31 @@ This two-stage design is deliberate: generation is cheap-ish and high-volume;
 enhancement is opt-in and only spent on winners, which is also how we justify its
 extra token cost to the user.
 
+**Stage 3 — Output post-processing (automatic, free).** Before a photo is shown in
+the gallery, every image runs through a finishing step:
+
+- **Metadata rewrite → "shot on iPhone."** Model-generated files carry no camera
+  EXIF (and providers may stamp their own tags). We strip that and write realistic
+  smartphone EXIF instead — `Make: Apple`, `Model: iPhone 15 Pro`, a plausible lens
+  (`24mm f/1.78`), exposure/ISO/shutter values consistent with the scene's lighting,
+  and a believable capture timestamp. The result is that a downloaded photo looks
+  like it came off a phone, not out of an AI tool — which is what makes it usable as
+  a candid dating/social photo.
+- Correct color profile, sharpening, and per-destination sizing/cropping (dating-app
+  export specs come later in Phase 3).
+
+> **Note on "make it look like an iPhone took it":** rewriting EXIF is standard and
+> uncontroversial. The separate, paid **AI-detectability removal** (Stage 4 below,
+> and §5) is a different, higher-risk feature with real policy implications — the two
+> are kept distinct on purpose.
+
+**Stage 4 — AI-detectability / fingerprint removal (opt-in, costs tokens).** A paid
+per-photo option that attempts to remove machine-detectable AI provenance signals
+(e.g., provider-embedded C2PA credentials and watermarks) so the image is less
+likely to be flagged by automated AI-image detectors. **This carries genuine legal,
+platform-policy, and provider-ToS risk — see §5 for the full treatment and the
+open decision on whether we ship it at all.**
+
 ### Dating-app extras
 
 - **Auto-recommendation:** a vision-model pass scores each generated (and enhanced)
@@ -89,10 +128,29 @@ Everything is denominated in **tokens** held in a per-user ledger:
 | Regenerate / modify a photo (new scene, wardrobe change, "fix hands") | 1–2 tokens |
 | Dating photo auto-recommendation (per batch) | 1 token |
 | Hinge caption pack (10 captions) | 1 token |
+| **Remove AI-detectability / fingerprint** (per photo — see §5) | 2 tokens |
 
 Tokens are the single currency, so "you can pay with the tokens you get for each
 photo to pay to modify the photos" falls out naturally: unused generation tokens
 can be spent on modifications/enhancements instead.
+
+### Buy-more-tokens (top-ups)
+
+Any user on any tier — including mid-cycle when they run out — can **buy more
+tokens** at any time via a one-time Stripe payment. These are add-on packs, separate
+from the monthly refresh, and they never expire while the subscription is active:
+
+| Pack | Tokens | Price (draft) | Effective $/photo |
+|---|---|---|---|
+| Small | 20 | $25 | $1.25 |
+| Medium | 50 | $55 | $1.10 |
+| Large | 120 | $120 | $1.00 |
+
+Top-up packs are priced slightly above the per-token rate baked into subscriptions,
+so subscribing is always the better deal (protects recurring revenue) while still
+giving heavy users an instant "I need more now" button. The Buy Tokens action lives
+in the dashboard header and appears inline whenever a job would exceed the current
+balance ("You need 6 more tokens for this batch — top up?").
 
 ### Plans (tiers sized like photography sessions)
 
@@ -103,12 +161,12 @@ without the studio, so we price in the same band:
 
 | Tier | Analogy | Tokens/mo | ≈ Photos | Price (draft) |
 |---|---|---|---|---|
-| **Trial** | Taster | 4 tokens, once | 2 photos + 1 enhancement | **One-time payment, 7-week trial** — $9 |
-| **Starter** | Standard session | 60/mo | ~40 | $99/mo |
-| **Pro** | Premium session | 150/mo | ~100 | $199/mo |
-| **Studio** | Full-day shoot | 400/mo | ~250+ | $399/mo |
+| **Trial** | Taster | 4 tokens, once | 2 photos + 1 enhancement | **One-time payment, 7-week trial** — $4.50 |
+| **Starter** | Standard session | 60/mo | ~40 | $70/mo |
+| **Pro** | Premium session | 150/mo | ~100 | $99/mo |
+| **Studio** | Full-day shoot | 400/mo | ~250+ | $170/mo |
 
-- Trial: **one-time Stripe payment** ($9), grants a small taster bundle — enough
+- Trial: **one-time Stripe payment** ($4.50), grants a small taster bundle — enough
   for 2 generated photos plus 1 enhancement — valid 7 weeks, then the user must
   pick a monthly tier to continue. Cheap enough to be an impulse buy; the 2 photos
   are the sales pitch for the full tiers.
@@ -117,7 +175,7 @@ without the studio, so we price in the same band:
 - **Top-up packs**: one-time token purchases for users who run out mid-cycle.
 
 (Prices/quantities are placeholders — we validate against actual model cost per
-image before launch; see §7 open questions.)
+image before launch; see §8 open questions.)
 
 ### Stripe implementation
 
@@ -164,15 +222,19 @@ the tab and come back.
 ### Data model (core tables)
 
 ```
-User        (id, email, name, gender_presentation, created_at)
+User        (id, email, name, gender_presentation, role, created_at)  -- role: user|admin
 Subscription(id, user_id, stripe_customer_id, stripe_sub_id, tier, status,
              trial_expires_at)
 TokenLedger (id, user_id, delta, reason, ref_id, created_at)   -- append-only
 UploadSet   (id, user_id, purpose, status)                     -- a "model" of the user's face
 Upload      (id, upload_set_id, s3_key, moderation_status)
-Job         (id, user_id, upload_set_id, purpose, status, tokens_charged)
+Job         (id, user_id, upload_set_id, purpose, status, tokens_charged,
+             provider_cost_cents)                              -- cost tracking for admin
 Photo       (id, job_id, s3_key, prompt_template_id, params_json, status,
-             liked_at, enhanced_photo_id, scores_json)         -- scores for app recs
+             liked_at, enhanced_photo_id, scores_json,         -- scores for app recs
+             detectability_removed_at)                         -- Stage 4 audit
+Purchase    (id, user_id, stripe_payment_id, kind, amount_cents, tokens_granted,
+             created_at)                                       -- trials + top-up packs
 PromptTemplate(id, purpose, name, scene, wardrobe, lighting, camera, aesthetic,
              active)
 CaptionPack (id, user_id, photo_ids[], app, captions_json)
@@ -186,11 +248,19 @@ POST /api/jobs                 — create generation job (debits tokens)
 GET  /api/jobs/:id             — job progress
 POST /api/photos/:id/like      — like → enqueue enhancement (debits tokens)
 POST /api/photos/:id/modify    — regenerate with tweaks (debits tokens)
+POST /api/photos/:id/undetect  — Stage 4 detectability removal (debits tokens; gated)
 POST /api/recommendations      — rank photos for bumble|hinge
 POST /api/captions             — generate Hinge captions for selected photos
-POST /api/stripe/checkout      — create Checkout session (trial | tier | top-up)
+POST /api/stripe/checkout      — create Checkout session (trial | tier | topup)
 POST /api/stripe/webhook       — ledger credits, subscription state
 GET  /api/me/balance           — derived token balance
+
+# Admin (role=admin only, all read-only except template mgmt)
+GET  /api/admin/metrics        — KPIs: MRR, active subs, tokens issued/spent, cost
+GET  /api/admin/users          — user list w/ tier, balance, lifetime spend
+GET  /api/admin/jobs           — job feed w/ status, tokens, provider cost, errors
+GET  /api/admin/revenue        — Stripe revenue vs. AI provider cost (margin)
+CRUD /api/admin/templates      — manage prompt template library (activate/retire)
 ```
 
 ---
@@ -232,26 +302,98 @@ This is the riskiest part of the product and needs to be designed in from day on
    minors — hard block with age-estimation check) and on generated outputs.
 4. **No impersonation contexts.** Templates never include uniforms/badges,
    government settings, or other-person embraces where the other face is visible.
-5. **Provenance.** Embed C2PA/metadata tagging photos as AI-generated (also
-   increasingly required by platform policies).
-6. **ToS compliance.** gpt-image-1's usage policies around photorealistic people
+5. **ToS compliance.** gpt-image-1's usage policies around photorealistic people
    must be reviewed and our consent flow aligned to them; this also shapes the
-   fallback-provider decision in §7.
-7. Clear ToS/Privacy: images private by default, deletion on request, no training
+   fallback-provider decision in §8.
+6. Clear ToS/Privacy: images private by default, deletion on request, no training
    on user photos, retention window (e.g., auto-delete uploads after 90 days).
+
+### Metadata & AI-provenance — the two things we do, and the risk on the second
+
+These were requested as product features; they need to be understood as two very
+different levels of risk.
+
+**(a) EXIF rewrite → "shot on iPhone" (low risk, ship it).** Writing plausible
+smartphone camera metadata onto the output is normal photo tooling — every editing
+app rewrites EXIF, and there's no law or platform rule requiring a photo to carry
+"no camera" metadata. This is fine to enable by default.
+
+**(b) AI-detectability / fingerprint removal (high risk — decision required before
+shipping).** Actively stripping provider-embedded provenance (C2PA credentials,
+invisible watermarks like SynthID-style markers) specifically so the image evades
+AI-detection is materially different, and the plan should not pretend otherwise:
+
+- **Regulation.** The EU AI Act (Art. 50) and a growing list of US state laws
+  require AI-generated media to be *disclosed/marked*, not de-marked. Selling a
+  tool whose purpose is to remove that marking may put us on the wrong side of
+  these rules in some markets.
+- **Provider ToS.** OpenAI (and most image providers) attach C2PA metadata and
+  prohibit removing it. Building a feature to strip it likely violates the API
+  terms we depend on — which could get our account terminated, taking the whole
+  product down.
+- **Platform policy.** Dating apps and social platforms increasingly ban
+  undisclosed AI photos; a user relying on this feature could get *their* account
+  banned, which is a support/liability problem for us.
+- **Framing.** Positioned as "make my own face look natural on my profile" it's
+  defensible; positioned as "defeat AI detectors" it reads as evasion. The line
+  matters legally and reputationally.
+
+**Recommendation:** keep the paid detectability-removal as a *flagged, off-by-default,
+region-gated* capability behind an explicit acknowledgment, and get a lawyer's read
+before it goes live — do **not** launch it in Phase 1. The EXIF-rewrite (a) delivers
+most of the "looks like a real photo" value on its own with none of this exposure.
+Final go/no-go on (b) is an open question in §8.
+
+7. **Provenance record (internal).** Regardless of what we strip from the *output*,
+   we keep an internal, tamper-evident record that each image was AI-generated
+   (who, when, which template, which references). This protects us in disputes and
+   lets us comply with a lawful takedown/traceability request even if the public
+   file is unmarked.
 
 ---
 
-## 6. Build Phases
+## 6. Admin Dashboard
+
+A separate `/admin` area (gated by `role=admin`, its own layout) so we can actually
+run the business and watch cost vs. revenue in real time:
+
+- **Overview KPIs:** MRR, active subscriptions by tier, trial→paid conversion,
+  new signups, churn, tokens issued vs. tokens spent this period.
+- **Revenue vs. cost:** Stripe revenue charted against AI-provider spend
+  (`Job.provider_cost_cents`) so gross margin is visible per day/week and per tier —
+  this is the number that tells us if pricing is right.
+- **Usage:** photos generated, enhancement attach rate, most-used templates,
+  detectability-removal usage (flagged feature — watch it closely), captions/recs
+  generated.
+- **Users:** searchable list with tier, current token balance, lifetime spend, job
+  history; drill into a user to see their ledger and jobs. Admin actions: grant/
+  refund tokens (writes to `TokenLedger` with an `admin_adjustment` reason), suspend
+  a user, resend a failed job.
+- **Jobs feed:** live job status with per-image errors and retry counts, so we catch
+  provider outages or a spiking failure rate before users complain.
+- **Template management:** activate/retire/A-B templates without a deploy (CRUD over
+  `PromptTemplate`).
+- **Moderation queue:** flagged uploads/outputs for human review.
+
+Built with the same Next.js app (admin route group), reading the same Postgres —
+metrics come from SQL aggregations over the ledger, jobs, and Stripe data, with
+heavier rollups cached. Access is role-gated at the middleware layer and every admin
+mutation is audit-logged.
+
+---
+
+## 7. Build Phases
 
 **Phase 1 — Core loop (MVP, ~weeks 1–3)**
 Auth, Stripe trial one-time payment, upload + consent + moderation, single
-purpose (dating), 12 templates, async generation pipeline, gallery, like →
-enhance, token ledger, download. *Ship to first testers.*
+purpose (dating), 12 templates, async generation pipeline, EXIF "iPhone" rewrite,
+gallery, like → enhance, token ledger, download. *Ship to first testers.*
+(AI-detectability removal is **not** in Phase 1 — see §5.)
 
 **Phase 2 — Monetization complete (~weeks 4–5)**
-Monthly tiers + Customer Portal, top-up packs, all three purposes with full
-template libraries, modify/regenerate flow, progress emails.
+Monthly tiers + Customer Portal, **buy-more-tokens top-up packs**, all three
+purposes with full template libraries, modify/regenerate flow, progress emails,
+and a **first cut of the admin dashboard** (KPIs + revenue-vs-cost + user list).
 
 **Phase 3 — Dating differentiators (~weeks 6–7)**
 Bumble/Hinge photo auto-recommendation with per-app rubrics, Hinge caption
@@ -265,28 +407,32 @@ plans.
 
 ---
 
-## 7. Open Questions (need decisions before/at kickoff)
+## 8. Open Questions (need decisions before/at kickoff)
 
 1. **Model economics.** gpt-image-1 costs roughly $0.02–$0.19 per image depending
    on quality/size — at "high", 100 photos ≈ $19 raw cost, so tier pricing must be
    validated against real per-image cost + retries. May use "medium" quality for
    Stage 1 drafts and "high" only for enhancement.
-2. **Face fidelity ceiling.** Prompt-based face-swap via gpt-image-1 is good but
-   not pixel-perfect on identity. If fidelity disappoints in testing, evaluate a
-   hybrid: gpt-image-1 for scene generation + a dedicated face-restoration/ID pass,
-   or alternative providers (e.g., Flux with identity adapters via a hosted API) —
-   keeping the same two-stage UX.
-3. **Trial mechanics.** Is the 7-week trial a fixed token bundle (recommended,
+2. **Face-swap engine choice.** To hit the "exact likeness, no uncanny valley"
+   goal, decide the swap approach: (a) a dedicated face-swap model that composites
+   the user's real face onto a generated body/scene (best identity fidelity), vs.
+   (b) prompt-based swap via gpt-image-1 alone (simpler, but softer on identity).
+   Leading candidate is a hybrid — gpt-image-1 (or Flux) generates the scene/body,
+   a dedicated swap + identity-restoration step owns the face — which is exactly why
+   the pipeline in §3 separates scene from face.
+3. **Detectability-removal go/no-go (Stage 4).** Ship it, region-gate it, or drop
+   it — pending legal review (§5). Default position: not in Phase 1.
+4. **Trial mechanics.** Is the 7-week trial a fixed token bundle (recommended,
    predictable cost) or metered weekly drip?
-4. **Rollover policy** for monthly tokens.
-5. **Gendered templates.** The example prompt is male-presenting; templates need
+5. **Rollover policy** for monthly tokens.
+6. **Gendered templates.** The example prompt is male-presenting; templates need
    `{subject}` parameterization and wardrobe variants from day one, chosen via
    onboarding.
-6. **Name/domain/branding.**
+7. **Name/domain/branding.**
 
 ---
 
-## 8. Success Metrics
+## 9. Success Metrics
 
 - Trial → paid conversion rate (target ≥ 25%)
 - Photos liked / photos generated (quality proxy, target ≥ 30%)
