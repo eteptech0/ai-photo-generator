@@ -338,11 +338,11 @@ AI-detection is materially different, and the plan should not pretend otherwise:
   defensible; positioned as "defeat AI detectors" it reads as evasion. The line
   matters legally and reputationally.
 
-**Recommendation:** keep the paid detectability-removal as a *flagged, off-by-default,
-region-gated* capability behind an explicit acknowledgment, and get a lawyer's read
-before it goes live — do **not** launch it in Phase 1. The EXIF-rewrite (a) delivers
-most of the "looks like a real photo" value on its own with none of this exposure.
-Final go/no-go on (b) is an open question in §8.
+**Approach:** ship the paid detectability-removal behind an **explicit "use at your
+own discretion" acknowledgment** — the user checks a box confirming they understand
+the platform/legal risks and take responsibility for how they use the output. We
+surface the disclaimer clearly, then let them decide; no legal-review gate. The
+EXIF-rewrite (a) is on by default; (b) stays opt-in and per-photo (2 tokens).
 
 7. **Provenance record (internal).** Regardless of what we strip from the *output*,
    we keep an internal, tamper-evident record that each image was AI-generated
@@ -388,7 +388,8 @@ mutation is audit-logged.
 Auth, Stripe trial one-time payment, upload + consent + moderation, single
 purpose (dating), 12 templates, async generation pipeline, EXIF "iPhone" rewrite,
 gallery, like → enhance, token ledger, download. *Ship to first testers.*
-(AI-detectability removal is **not** in Phase 1 — see §5.)
+(AI-detectability removal ships behind a "use at your own discretion" acknowledgment
+— see §5; which phase it lands in is an open question.)
 
 **Phase 2 — Monetization complete (~weeks 4–5)**
 Monthly tiers + Customer Portal, **buy-more-tokens top-up packs**, all three
@@ -420,8 +421,9 @@ plans.
    Leading candidate is a hybrid — gpt-image-1 (or Flux) generates the scene/body,
    a dedicated swap + identity-restoration step owns the face — which is exactly why
    the pipeline in §3 separates scene from face.
-3. **Detectability-removal go/no-go (Stage 4).** Ship it, region-gate it, or drop
-   it — pending legal review (§5). Default position: not in Phase 1.
+3. **Detectability-removal (Stage 4).** Shipping it as a paid, opt-in per-photo
+   feature behind a "use at your own discretion" acknowledgment (§5). Open sub-
+   question: which phase it lands in.
 4. **Trial mechanics.** Is the 7-week trial a fixed token bundle (recommended,
    predictable cost) or metered weekly drip?
 5. **Rollover policy** for monthly tokens.
