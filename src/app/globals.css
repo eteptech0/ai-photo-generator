@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------
+   3queue design tokens
+   Dark-first. One accent. Alternating dark/light bands for rhythm.
+   --------------------------------------------------------------- */
+@theme {
+  --color-ink: #0b0c0e;
+  --color-ink-raised: #131519;
+  --color-ink-sunken: #08090a;
+  --color-paper: #f4f2ed;
+  --color-paper-raised: #ffffff;
+
+  --color-fg: #eae8e3;
+  --color-fg-muted: #9aa0a6;
+  --color-fg-inverse: #14161a;
+  --color-fg-inverse-muted: #5c626b;
+
+  --color-accent: #ff5c35;
+  --color-accent-hover: #ff7a58;
+  --color-accent-ink: #1a0a05;
+
+  --color-line: rgba(234, 232, 227, 0.12);
+  --color-line-strong: rgba(234, 232, 227, 0.22);
+  --color-line-inverse: rgba(20, 22, 26, 0.12);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+
+  --text-display: clamp(2.75rem, 6.5vw, 5.25rem);
+  --text-display--line-height: 0.98;
+  --text-display--letter-spacing: -0.035em;
+
+  --text-title: clamp(2rem, 4vw, 3.25rem);
+  --text-title--line-height: 1.05;
+  --text-title--letter-spacing: -0.028em;
+
+  --text-lead: clamp(1.0625rem, 1.5vw, 1.3125rem);
+  --text-lead--line-height: 1.55;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-ink);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--color-accent);
+    color: var(--color-accent-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+}
+
+@layer utilities {
+  /* Small uppercase label used above section headings. */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  /* Faint dotted field used behind the hero. */
+  .grid-field {
+    background-image: radial-gradient(
+      circle at 1px 1px,
+      rgba(234, 232, 227, 0.14) 1px,
+      transparent 0
+    );
+    background-size: 32px 32px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
